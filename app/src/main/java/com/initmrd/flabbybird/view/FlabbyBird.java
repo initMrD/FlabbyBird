@@ -8,6 +8,8 @@ import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.util.Log;
+import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
@@ -22,6 +24,8 @@ import java.util.List;
  */
 
 public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Runnable{
+
+    private static final String TAG = "FlabbyBird";
 
     private SurfaceHolder mSurfaceHolder;
 
@@ -41,36 +45,53 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
 
     private Bitmap mBackground;
 
-//    小鸟
+//    ===============小鸟部分===============
     private Bird bird;
 
     private Bitmap mBird;
 
-//    地板
+//    ===============地板部分===============
     private Floor floor;
 
     private Bitmap mFloor;
 
     private int mSpeed;
 
-//    管道
+//    ===============管道部分===============
+
+//    上管子
     private Bitmap pipeTop;
 
+//    下管子
     private Bitmap pipeBottom;
 
+//    管子图像
     private RectF pipeRect;
 
+//    管子宽度的Dp
     private int pipeWidth;
 
+//    管子宽度
     private static final int PIPE_WIDTH = 60;
 
+
+//    管道列表
     private List<Pipe> pipeList = new ArrayList<Pipe>();
 
-//    分数
+//    移除的管道列表
+    private List<Pipe> removePipeList = new ArrayList<Pipe>();
+
+//    两个管子的距离
+    private final static int PIPE_BETWEEN_PIPE = 600;
+
+//    缓存的移动距离
+    private int tempMove;
+
+//    ===============分数部分===============
     private int[] num = new int[]{R.drawable.n0,R.drawable.n1,R.drawable.n2,R.drawable.n3,R.drawable.n4,
             R.drawable.n5,R.drawable.n6,R.drawable.n7,R.drawable.n8,R.drawable.n9};
 
-    private int mGrade = 100;
+    private int mGrade = 0;
 
     private Bitmap[] mNumBitmap;
 
@@ -80,9 +101,145 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
 
     private RectF numRect;
 
+//    ===============       ===============
+    //状态类型
+    private enum GameStatus{
+        WAITING, RUNNING, STOP
+    }
+
+    //当前状态
+    private GameStatus mStatus = GameStatus.WAITING;
+
+    //鸟点击之后上升的距离
+    private static final int TOUCH_UP_SIZE = -16;
+
+    //将上升的距离转化为dp
+    private final int birdUpDp = Util.dp2px(getContext(), TOUCH_UP_SIZE);
+
+    private int tmpBird;
+
+    //自动下落速度
+    private final int autoDownSpeed = Util.dp2px(getContext(), 2);
+
+    //逻辑部分
+    private void logic(){
+        switch (mStatus){
+            case RUNNING:
+                //开始计数
+                mGrade = 0;
+
+                //创建管道
+                tempMove += mSpeed;
+                //当画面每移动PIPE_BETWEEN_PIPE就生成一个管子
+                if(tempMove >= PIPE_BETWEEN_PIPE){
+                    Pipe pipe = new Pipe(getContext(), getWidth(), getHeight(), pipeTop, pipeBottom);
+                    pipeList.add(pipe);
+                    tempMove = 0;
+                }
+                //每移除的一根管子记一分
+                mGrade += removePipeList.size();
+
+                //管道处理
+                for(Pipe pipe: pipeList){
+                    //穿过管子加一分
+                    if(pipe.getX() + pipeWidth < bird.getX()){
+                        mGrade++;
+                    }
+                    //标记待移除管道
+                    if(pipe.getX() < -pipeWidth){
+                        removePipeList.add(pipe);
+                        continue;
+                    }
+                    //移动管道
+                    pipe.setX(pipe.getX() - mSpeed);
+                }
+
+                //移除管道
+                pipeList.removeAll(removePipeList);
+
+                Log.d(TAG, "剩余管道数量" + pipeList.size());
+
+                //移动地板
+                floor.setX(floor.getX() - mSpeed);
+
+                //鸟的移动
+                //默认下落 点击上升
+                tmpBird += autoDownSpeed;
+                bird.setY(bird.getY() + tmpBird);
+
+                //判断游戏结束
+                checkGameOver();
+
+                break;
+            case STOP:
+                //如果鸟撞了管子
+                if(bird.getY() < floor.getY() - bird.getHeight()){
+                    //让鸟进行自由落体
+                    tmpBird += autoDownSpeed;
+                    bird.setY(bird.getY() + tmpBird);
+                }else {
+                    //初始化状态
+                    mStatus = GameStatus.WAITING;
+                    initPosition();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void initPosition(){
+        pipeList.clear();
+        removePipeList.clear();
+        bird.setY(mHeight * 2 / 3);
+        tmpBird = 0;
+    }
+
+
+    private void checkGameOver(){
+        //地板判断
+        if(bird.getY() > floor.getY() - bird.getHeight()){
+            mStatus = GameStatus.STOP;
+        }
+        //管子判断
+        for(Pipe pipe:pipeList){
+            //已经穿过的管子
+            if(pipe.getX() + pipeWidth < bird.getX()){
+                //跳过
+                continue;
+            }
+            //没穿过的管子,判断时候碰到
+            if(pipe.touchBird(bird)){
+                mStatus = GameStatus.STOP;
+                break;
+            }
+        }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        int action = event.getAction();
+
+        if(action == MotionEvent.ACTION_DOWN){
+            switch (mStatus){
+                case RUNNING:
+                    tmpBird = birdUpDp;
+                    break;
+                case WAITING:
+                    mStatus = GameStatus.RUNNING;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        return true;
+    }
+
     public FlabbyBird(Context context){
         this(context ,null);
     }
+
 
     public FlabbyBird(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -136,6 +293,7 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
     public void run() {
         while (isRunning){
             long start = System.currentTimeMillis();
+            logic();
             draw();
             long stop = System.currentTimeMillis();
 
@@ -184,7 +342,7 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
 
     private void drawPipe(){
         for(Pipe pipe: pipeList){
-            pipe.setX(pipe.getX() - mSpeed);
+//            pipe.setX(pipe.getX() - mSpeed);
             pipe.draw(mCanvas,pipeRect);
         }
     }
@@ -233,7 +391,7 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
                 drawFloor();
                 drawNum();
 
-                floor.setX(floor.getX() - mSpeed);
+//                floor.setX(floor.getX() - mSpeed);
             }
         }catch (Exception e){
 

@@ -46,9 +46,18 @@ public class Pipe {
 
     }
 
+    public boolean touchBird(Bird bird){
+        //判断小鸟是否碰撞到管子
+        if(bird.getX() + bird.getWidth() > x
+                && (bird.getY() < upHeight ||bird.getY() + bird.getHeight() > upHeight +margin)){
+            return true;
+        }
+        return false;
+    }
+
     private void randomHeight(int height){
         upHeight = random.nextInt((int) (height * (MAX_UP_PIPE_HEIGHT - MIN_UP_PIPE_HEIGHT)));
-        upHeight = (int) (upHeight + upHeight * MIN_UP_PIPE_HEIGHT);
+        upHeight = (int) (upHeight + height * MIN_UP_PIPE_HEIGHT);
     }
 
     public void draw(Canvas canvas, RectF rectF){

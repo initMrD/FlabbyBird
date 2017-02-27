@@ -60,4 +60,7 @@ public class Bird {
         return height;
     }
 
+    public void setY(int y) {
+        this.y = y;
+    }
 }
