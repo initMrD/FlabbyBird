@@ -13,7 +13,7 @@ import com.initmrd.flabbybird.util.Util;
 
 public class Bird {
     //鸟的初始高度
-    private static final float BIRD_START_POS = 2/3F;
+    private static final float BIRD_START_POS = 1/3F;
 
     //鸟的大小
     private static final int BIRD_SIZE = 30;

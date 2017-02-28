@@ -7,6 +7,8 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
+import android.media.MediaRecorder;
+import android.os.Environment;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -16,6 +18,7 @@ import android.view.SurfaceView;
 import com.initmrd.flabbybird.R;
 import com.initmrd.flabbybird.util.Util;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -101,7 +104,11 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
 
     private RectF numRect;
 
-//    ===============       ===============
+//    ===============录音相关===============
+    private MediaRecorder mediaRecorder;
+
+    private static final int JUMP = 600;
+
     //状态类型
     private enum GameStatus{
         WAITING, RUNNING, STOP
@@ -127,7 +134,6 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
             case RUNNING:
                 //开始计数
                 mGrade = 0;
-
                 //创建管道
                 tempMove += mSpeed;
                 //当画面每移动PIPE_BETWEEN_PIPE就生成一个管子
@@ -157,7 +163,7 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
                 //移除管道
                 pipeList.removeAll(removePipeList);
 
-                Log.d(TAG, "剩余管道数量" + pipeList.size());
+//                Log.d(TAG, "剩余管道数量" + pipeList.size());
 
                 //移动地板
                 floor.setX(floor.getX() - mSpeed);
@@ -173,6 +179,9 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
                 break;
             case STOP:
                 //如果鸟撞了管子
+                if(mediaRecorder !=null){
+                    stopRecode();
+                }
                 if(bird.getY() < floor.getY() - bird.getHeight()){
                     //让鸟进行自由落体
                     tmpBird += autoDownSpeed;
@@ -191,8 +200,14 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
     private void initPosition(){
         pipeList.clear();
         removePipeList.clear();
-        bird.setY(mHeight * 2 / 3);
+        bird.setY(mHeight * 1 / 3);
         tmpBird = 0;
+    }
+
+    private void stopRecode(){
+        mediaRecorder.stop();
+        mediaRecorder.release();
+        mediaRecorder = null;
     }
 
 
@@ -226,6 +241,18 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
                     tmpBird = birdUpDp;
                     break;
                 case WAITING:
+                    try {
+                        mediaRecorder = new MediaRecorder();
+                        String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/FlabbyBird" + System.currentTimeMillis() + ".3gp";
+                        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+                        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+                        mediaRecorder.setAudioEncoder(MediaRecorder.OutputFormat.AMR_NB);
+                        mediaRecorder.setOutputFile(filePath);
+                        mediaRecorder.prepare();
+                        mediaRecorder.start();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                     mStatus = GameStatus.RUNNING;
                     break;
                 default:
@@ -293,6 +320,14 @@ public class FlabbyBird extends SurfaceView implements SurfaceHolder.Callback,Ru
     public void run() {
         while (isRunning){
             long start = System.currentTimeMillis();
+            if(mediaRecorder != null){
+//                Log.d(TAG,(mediaRecorder.getMaxAmplitude() > 20) +"");
+                int tempsound = mediaRecorder.getMaxAmplitude();
+                if(tempsound > JUMP){
+                    Log.d(TAG,tempsound +"");
+                    tmpBird = birdUpDp;
+                }
+            }
             logic();
             draw();
             long stop = System.currentTimeMillis();
